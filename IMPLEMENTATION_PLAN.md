@@ -1,8 +1,8 @@
 # Cartesi Notary DApp - MVP Implementation Plan
 
-**Status:** Days 1-2 Completed ✅ | Days 3-5 Remaining
+**Status:** Days 1-4 Completed ✅ | Day 5 Remaining
 **Last Updated:** 2025-01-09
-**Test Status:** 24/24 passing
+**Test Status:** 44/44 passing (24 unit + 11 integration + 9 helpers/mock)
 
 ## 🎯 MVP Goal
 
@@ -72,389 +72,99 @@ Build a hash-based document notarization service on Cartesi that:
 
 ---
 
-## 📋 Remaining Work
+### Day 3: Cartesi Integration (Completed ✅)
 
-### Day 3: Cartesi Integration (Handlers)
+**Application Layer:**
+- `src/application/types.rs` - Request/Response types with serde
+- `src/handlers.rs` - Exported handlers for main and tests
+- `src/infrastructure/cartesi.rs` - Notice/Report emission
 
-**Goal:** Connect use cases to Cartesi rollup request/response cycle
+**Main Implementation:**
+- `src/main.rs` - Rollup loop with finish endpoint polling
 
-#### 3.1 Create Request/Response Types
+**Features Implemented:**
+- **Request Types:**
+  - `InputAction` tagged union for action routing
+  - `NotarizeRequest` with base64 content
+  - `VerifyRequest` with content_hash
 
-**File:** `src/application/types.rs`
+- **Response Types:**
+  - `NoticeResponse` for notarization receipts (verifiable)
+  - `ReportResponse` for verification results (non-verifiable)
 
-```rust
-use serde::{Deserialize, Serialize};
+- **Handlers:**
+  - `handle_advance` - Hex decode → Parse → Route → Execute → Send notice/report
+  - `handle_inspect` - Hex decode → Parse → Verify → Send report
 
-#[derive(Debug, Deserialize)]
-pub struct NotarizeRequest {
-    pub content: String,      // base64 encoded
-    pub file_name: String,
-    pub mime_type: String,
-}
+- **Cartesi Integration:**
+  - `send_notice` - POST /notice with hex-encoded payload
+  - `send_report` - POST /report with hex-encoded payload
+  - Database path configurable via NOTARY_DB_PATH env var
 
-#[derive(Debug, Deserialize)]
-pub struct VerifyRequest {
-    pub content_hash: String,
-}
+**Key Decisions:**
+- Per-request repository connections (avoids Sync issues)
+- Handler module exported for testing
+- Base64 Engine API for content encoding
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "action")]
-pub enum InputAction {
-    #[serde(rename = "notarize")]
-    Notarize { data: NotarizeRequest },
+**Code Metrics:**
+- Production: 479 lines
+- Handlers: 203 lines
+- Files: 12
 
-    #[serde(rename = "verify")]
-    Verify { data: VerifyRequest },
-}
+---
 
-#[derive(Debug, Serialize)]
-pub struct NoticeResponse {
-    #[serde(rename = "type")]
-    pub response_type: String,
-    pub receipt: NotarizationReceipt,
-}
+### Day 4: Integration Testing (11 tests ✅)
 
-#[derive(Debug, Serialize)]
-pub struct ReportResponse {
-    pub verification: VerificationResult,
-}
-```
+**Test Infrastructure:**
+- `tests/integration/mock_server.rs` - MockRollupServer HTTP server
+- `tests/integration/helpers.rs` - Test helpers and TestDatabase guard
+- `tests/integration/rollup_tests.rs` - End-to-end tests
 
-#### 3.2 Implement Notice/Report Emission
+**Features Implemented:**
+- **MockRollupServer:**
+  - Hyper HTTP server on random port
+  - Captures notices and reports
+  - Decodes hex payloads
+  - Runs in background tokio task
 
-**File:** `src/infrastructure/cartesi.rs`
+- **Test Helpers:**
+  - `TestDatabase` - RAII guard for temp database files
+  - `create_advance_request` - Format advance_state requests
+  - `create_inspect_request` - Format inspect_state requests
+  - `create_notarize_payload` - JSON with base64 content
+  - `create_verify_payload` - JSON with content_hash
 
-```rust
-use hyper::{Body, Client, Method, Request};
-use std::error::Error;
+- **Integration Tests:**
+  - `test_notarize_document_workflow` - Full notarization cycle
+  - `test_notarize_duplicate_rejected` - Duplicate detection
+  - `test_verify_existing_document` - Verification of notarized doc
+  - `test_verify_nonexistent_document` - Not found handling
+  - `test_invalid_json_rejected` - Error handling
+  - `test_invalid_base64_rejected` - Input validation
 
-pub async fn send_notice(
-    client: &Client<hyper::client::HttpConnector>,
-    server_url: &str,
-    payload: &str,
-) -> Result<(), Box<dyn Error>> {
-    let payload_hex = hex::encode(payload);
+**Key Fixes:**
+- Database persistence via NOTARY_DB_PATH environment variable
+- VerifyRequest format for inspect (not InputAction)
+- Serial test execution (--test-threads=1) to avoid env var conflicts
+- Added hyper "server" feature to Cargo.toml
 
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri(format!("{}/notice", server_url))
-        .header("content-type", "application/json")
-        .body(Body::from(json::object! {
-            "payload" => payload_hex
-        }.dump()))?;
-
-    let response = client.request(request).await?;
-
-    if !response.status().is_success() {
-        return Err(format!("Failed to send notice: {}", response.status()).into());
-    }
-
-    Ok(())
-}
-
-pub async fn send_report(
-    client: &Client<hyper::client::HttpConnector>,
-    server_url: &str,
-    payload: &str,
-) -> Result<(), Box<dyn Error>> {
-    let payload_hex = hex::encode(payload);
-
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri(format!("{}/report", server_url))
-        .header("content-type", "application/json")
-        .body(Body::from(json::object! {
-            "payload" => payload_hex
-        }.dump()))?;
-
-    let response = client.request(request).await?;
-
-    if !response.status().is_success() {
-        return Err(format!("Failed to send report: {}", response.status()).into());
-    }
-
-    Ok(())
-}
-```
-
-#### 3.3 Update main.rs Handlers
-
-**File:** `src/main.rs`
-
-Replace `handle_advance` and `handle_inspect` with:
-
-```rust
-use dapp::application::{NotarizeUseCase, VerifyUseCase, InputAction, NoticeResponse, ReportResponse};
-use dapp::infrastructure::{database::SqliteRepository, cartesi::{send_notice, send_report}};
-use base64;
-
-// Global repository - initialized once at startup
-lazy_static::lazy_static! {
-    static ref REPOSITORY: SqliteRepository =
-        SqliteRepository::new("/var/lib/notary/notary.db")
-            .expect("Failed to initialize database");
-}
-
-pub async fn handle_advance(
-    client: &hyper::Client<hyper::client::HttpConnector>,
-    server_addr: &str,
-    request: JsonValue,
-) -> Result<&'static str, Box<dyn std::error::Error>> {
-    println!("Received advance request");
-
-    // Extract and decode payload
-    let payload_hex = request["data"]["payload"]
-        .as_str()
-        .ok_or("Missing payload")?;
-
-    let payload_bytes = hex::decode(payload_hex)?;
-    let payload_str = std::str::from_utf8(&payload_bytes)?;
-
-    // Parse input action
-    let input: InputAction = serde_json::from_str(payload_str)?;
-
-    // Get submitter from metadata
-    let submitter = request["data"]["metadata"]["msg_sender"]
-        .as_str()
-        .unwrap_or("unknown");
-
-    let block_number = request["data"]["metadata"]["block_number"]
-        .as_u64()
-        .unwrap_or(0);
-
-    match input {
-        InputAction::Notarize { data } => {
-            // Decode base64 content
-            let content = base64::decode(&data.content)?;
-
-            // Execute notarization
-            let notarize_usecase = NotarizeUseCase::new(Box::new(&*REPOSITORY));
-            let receipt = notarize_usecase.execute(
-                &content,
-                &data.file_name,
-                &data.mime_type,
-                submitter,
-                block_number,
-            )?;
-
-            // Send notice
-            let response = NoticeResponse {
-                response_type: "notarization_receipt".to_string(),
-                receipt,
-            };
-            let notice_json = serde_json::to_string(&response)?;
-            send_notice(client, server_addr, &notice_json).await?;
-
-            println!("Document notarized successfully");
-            Ok("accept")
-        }
-        InputAction::Verify { data } => {
-            // Verification via advance (could also be inspect)
-            let verify_usecase = VerifyUseCase::new(Box::new(&*REPOSITORY));
-            let result = verify_usecase.execute(&data.content_hash)?;
-
-            let response = ReportResponse {
-                verification: result,
-            };
-            let report_json = serde_json::to_string(&response)?;
-            send_report(client, server_addr, &report_json).await?;
-
-            Ok("accept")
-        }
-    }
-}
-
-pub async fn handle_inspect(
-    client: &hyper::Client<hyper::client::HttpConnector>,
-    server_addr: &str,
-    request: JsonValue,
-) -> Result<&'static str, Box<dyn std::error::Error>> {
-    println!("Received inspect request");
-
-    // Extract and decode payload
-    let payload_hex = request["data"]["payload"]
-        .as_str()
-        .ok_or("Missing payload")?;
-
-    let payload_bytes = hex::decode(payload_hex)?;
-    let payload_str = std::str::from_utf8(&payload_bytes)?;
-
-    // Parse verify request
-    let verify_req: VerifyRequest = serde_json::from_str(payload_str)?;
-
-    // Execute verification
-    let verify_usecase = VerifyUseCase::new(Box::new(&*REPOSITORY));
-    let result = verify_usecase.execute(&verify_req.content_hash)?;
-
-    // Send report
-    let response = ReportResponse {
-        verification: result,
-    };
-    let report_json = serde_json::to_string(&response)?;
-    send_report(client, server_addr, &report_json).await?;
-
-    Ok("accept")
-}
-```
-
-#### 3.4 Add Dependencies
-
-**Cargo.toml:**
-```toml
-[dependencies]
-# ... existing dependencies ...
-lazy_static = "1.4"
-```
-
-#### 3.5 Testing Strategy
-
-**Manual Testing:**
+**Test Execution:**
 ```bash
-# Run locally (override RISC-V target)
-cargo build --target aarch64-apple-darwin
+# Run all tests (must specify --test-threads=1 for integration tests)
+cargo test --target aarch64-apple-darwin -- --test-threads=1
 
-# Test with curl (if you have a mock server)
-echo '{"action":"notarize","data":{"content":"SGVsbG8gV29ybGQ=","file_name":"test.txt","mime_type":"text/plain"}}' | \
-  base64 | \
-  xxd -p -c 256
+# Run only integration tests
+cargo test --test integration --target aarch64-apple-darwin -- --test-threads=1
 ```
 
-**Success Criteria:**
-- [ ] Request parsing works (InputAction deserialization)
-- [ ] Notarization emits notice with receipt
-- [ ] Verification emits report with result
-- [ ] Errors handled gracefully (reject status)
+**Code Metrics:**
+- Test code: 370 lines
+- Mock server: 167 lines
+- Total: 44 tests passing (24 unit + 20 integration)
 
 ---
 
-### Day 4: Integration Testing
-
-**Goal:** End-to-end tests with mock rollup server
-
-#### 4.1 Create Mock Rollup Server
-
-**File:** `tests/integration/mock_server.rs`
-
-```rust
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server, StatusCode};
-use std::sync::{Arc, Mutex};
-
-pub struct MockRollupServer {
-    notices: Arc<Mutex<Vec<String>>>,
-    reports: Arc<Mutex<Vec<String>>>,
-}
-
-impl MockRollupServer {
-    pub fn new() -> Self {
-        Self {
-            notices: Arc::new(Mutex::new(Vec::new())),
-            reports: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    pub async fn start(self) -> String {
-        let notices = self.notices.clone();
-        let reports = self.reports.clone();
-
-        let make_svc = make_service_fn(move |_conn| {
-            let notices = notices.clone();
-            let reports = reports.clone();
-
-            async move {
-                Ok::<_, hyper::Error>(service_fn(move |req| {
-                    handle_request(req, notices.clone(), reports.clone())
-                }))
-            }
-        });
-
-        let addr = ([127, 0, 0, 1], 0).into();
-        let server = Server::bind(&addr).serve(make_svc);
-        let url = format!("http://{}", server.local_addr());
-
-        tokio::spawn(server);
-        url
-    }
-
-    pub fn get_notices(&self) -> Vec<String> {
-        self.notices.lock().unwrap().clone()
-    }
-
-    pub fn get_reports(&self) -> Vec<String> {
-        self.reports.lock().unwrap().clone()
-    }
-}
-
-async fn handle_request(
-    req: Request<Body>,
-    notices: Arc<Mutex<Vec<String>>>,
-    reports: Arc<Mutex<Vec<String>>>,
-) -> Result<Response<Body>, hyper::Error> {
-    // Extract payload from request
-    // Store in appropriate vector
-    // Return success response
-    Ok(Response::new(Body::from("OK")))
-}
-```
-
-#### 4.2 Write Integration Tests
-
-**File:** `tests/integration/rollup_tests.rs`
-
-```rust
-#[tokio::test]
-async fn test_full_notarization_workflow() {
-    let mock_server = MockRollupServer::new();
-    let url = mock_server.start().await;
-
-    // Create notarize request
-    let input = json::object! {
-        "action" => "notarize",
-        "data" => {
-            "content" => base64::encode(b"test document"),
-            "file_name" => "test.pdf",
-            "mime_type" => "application/pdf"
-        }
-    };
-
-    let request = create_advance_request(&input);
-
-    // Call handler
-    let client = hyper::Client::new();
-    let status = handle_advance(&client, &url, request).await.unwrap();
-
-    // Verify
-    assert_eq!(status, "accept");
-    let notices = mock_server.get_notices();
-    assert_eq!(notices.len(), 1);
-
-    // Parse notice and verify receipt
-    let notice: NoticeResponse = serde_json::from_str(&notices[0]).unwrap();
-    assert_eq!(notice.response_type, "notarization_receipt");
-    assert_eq!(notice.receipt.content_hash.len(), 64);
-}
-
-#[tokio::test]
-async fn test_duplicate_document_rejected() {
-    // Submit same document twice
-    // Verify second attempt returns "reject"
-}
-
-#[tokio::test]
-async fn test_verification_workflow() {
-    // Notarize a document
-    // Query via inspect
-    // Verify report contains correct data
-}
-```
-
-**Success Criteria:**
-- [ ] 3 integration tests passing
-- [ ] Mock server captures notices/reports
-- [ ] Full request/response cycle works
-- [ ] Error cases handled (reject status)
-
----
+## 📋 Remaining Work
 
 ### Day 5: Docker & Documentation
 
