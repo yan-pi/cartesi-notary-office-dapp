@@ -83,8 +83,6 @@ pub async fn send_report(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_hex_encoding() {
         let json_payload = r#"{"test":"data"}"#;

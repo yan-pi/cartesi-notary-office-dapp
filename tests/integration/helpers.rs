@@ -22,7 +22,11 @@ impl Drop for TestDatabase {
 }
 
 /// Create a test advance_state request
-pub fn create_advance_request(payload_json: &str, msg_sender: &str, block_number: u64) -> JsonValue {
+pub fn create_advance_request(
+    payload_json: &str,
+    msg_sender: &str,
+    block_number: u64,
+) -> JsonValue {
     let payload_hex = hex::encode(payload_json);
 
     json::object! {
@@ -65,10 +69,7 @@ pub fn create_notarize_payload(content: &[u8], file_name: &str, mime_type: &str)
 
 /// Create a verify payload for inspect requests (VerifyRequest format)
 pub fn create_verify_payload(content_hash: &str) -> String {
-    format!(
-        r#"{{"content_hash":"{}"}}"#,
-        content_hash
-    )
+    format!(r#"{{"content_hash":"{}"}}"#, content_hash)
 }
 
 /// Decode a hex-encoded payload
@@ -88,8 +89,14 @@ mod tests {
         let req = create_advance_request(payload, "0x123", 100);
 
         assert_eq!(req["request_type"].as_str().unwrap(), "advance_state");
-        assert_eq!(req["data"]["metadata"]["msg_sender"].as_str().unwrap(), "0x123");
-        assert_eq!(req["data"]["metadata"]["block_number"].as_u64().unwrap(), 100);
+        assert_eq!(
+            req["data"]["metadata"]["msg_sender"].as_str().unwrap(),
+            "0x123"
+        );
+        assert_eq!(
+            req["data"]["metadata"]["block_number"].as_u64().unwrap(),
+            100
+        );
 
         // Verify payload is hex-encoded
         let payload_hex = req["data"]["payload"].as_str().unwrap();
