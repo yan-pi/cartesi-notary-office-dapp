@@ -5,6 +5,7 @@ A blockchain-based document notarization service built on Cartesi's optimistic r
 ## Overview
 
 The Cartesi Notary DApp allows users to:
+
 - **Notarize documents** - Submit documents and receive cryptographic receipts
 - **Verify documents** - Check if a document has been notarized by content hash
 - **Detect duplicates** - Prevent double-notarization of the same content
@@ -95,6 +96,7 @@ cartesi notices --rpc-url http://localhost:8545
 ```
 
 **Important:**
+
 - You MUST include `--rpc-url http://localhost:8545 --mnemonic-index 0` for local development
 - Without these flags, you'll get a chain selection prompt instead
 - See [docs/API.md](docs/API.md) for more examples and troubleshooting
@@ -142,11 +144,12 @@ See [docs/API.md](docs/API.md) for detailed API specification.
 ### Notarize a Document
 
 **Request (advance_state input):**
+
 ```json
 {
   "action": "notarize",
   "data": {
-    "content": "SGVsbG8gV29ybGQ=",  // base64-encoded document
+    "content": "SGVsbG8gV29ybGQ=", // base64-encoded document
     "file_name": "document.pdf",
     "mime_type": "application/pdf"
   }
@@ -154,6 +157,7 @@ See [docs/API.md](docs/API.md) for detailed API specification.
 ```
 
 **Response (Notice):**
+
 ```json
 {
   "type": "notarization_receipt",
@@ -170,6 +174,7 @@ See [docs/API.md](docs/API.md) for detailed API specification.
 ### Verify a Document
 
 **Request (inspect_state input):**
+
 ```json
 {
   "content_hash": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
@@ -177,6 +182,7 @@ See [docs/API.md](docs/API.md) for detailed API specification.
 ```
 
 **Response (Report):**
+
 ```json
 {
   "exists": true,
@@ -312,8 +318,6 @@ This is a university project (UFBA final project). For questions or suggestions,
 - [Cartesi Documentation](https://docs.cartesi.io/)
 - [Cartesi Rollups](https://docs.cartesi.io/cartesi-rollups/)
 - [Rust SQLite](https://docs.rs/rusqlite/)
-- [PROJECT_GUIDE.md](PROJECT_GUIDE.md) - Original specification
-- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) - Development roadmap
 - [docs/API.md](docs/API.md) - API specification
 
 **MVP Complete** - Ready for deployment and testing on Cartesi network.
