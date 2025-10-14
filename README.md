@@ -2,7 +2,7 @@
 
 A blockchain-based document notarization service built on Cartesi's optimistic rollups. This DApp leverages RISC-V computation to provide tamper-proof, verifiable document notarization with SHA-256 hashing and timestamp proofs.
 
-## 🎯 Overview
+## Overview
 
 The Cartesi Notary DApp allows users to:
 - **Notarize documents** - Submit documents and receive cryptographic receipts
@@ -12,7 +12,7 @@ The Cartesi Notary DApp allows users to:
 
 All computations run off-chain in a RISC-V Linux VM (Cartesi Machine), providing Ethereum-level security with minimal gas costs.
 
-## 🏗️ Architecture
+## Architecture
 
 Built following **Clean Architecture** principles:
 
@@ -47,7 +47,7 @@ Built following **Clean Architecture** principles:
 - **Serialization:** serde + serde_json
 - **Testing:** 44 tests (24 unit + 20 integration)
 
-## 📋 Prerequisites
+## Prerequisites
 
 - **Rust** 1.70+ with `riscv64gc-unknown-linux-gnu` target
 - **Docker** for Cartesi builds
@@ -59,7 +59,7 @@ Built following **Clean Architecture** principles:
 rustup target add riscv64gc-unknown-linux-gnu
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Build Natively (for testing)
 
@@ -99,7 +99,7 @@ cartesi notices --rpc-url http://localhost:8545
 - Without these flags, you'll get a chain selection prompt instead
 - See [docs/API.md](docs/API.md) for more examples and troubleshooting
 
-## 🧪 Testing
+## Testing
 
 ### Run All Tests
 
@@ -135,7 +135,7 @@ cargo test -- --nocapture --test-threads=1
 - **Unit tests**: Domain entities, database layer, use cases
 - **Integration tests**: End-to-end workflows with mock Cartesi server
 
-## 📖 API Usage
+## API Usage
 
 See [docs/API.md](docs/API.md) for detailed API specification.
 
@@ -198,7 +198,7 @@ See [docs/API.md](docs/API.md) for detailed API specification.
 }
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 final-project/
@@ -243,7 +243,7 @@ final-project/
 └── README.md                      # This file
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -270,9 +270,9 @@ CREATE INDEX idx_created_at ON documents(created_at);
 
 **Duplicate Prevention:** The `UNIQUE` constraint on `content_hash` ensures no document can be notarized twice.
 
-## 🎓 Key Features
+## Key Features
 
-### ✅ Implemented
+### Implemented
 
 - [x] SHA-256 document hashing
 - [x] SQLite persistence with UNIQUE constraints
@@ -285,7 +285,7 @@ CREATE INDEX idx_created_at ON documents(created_at);
 - [x] 44 comprehensive tests
 - [x] RISC-V Docker build
 
-### 🔮 Future Enhancements
+### Future Enhancements
 
 - [ ] GPG signature verification
 - [ ] IPFS integration for document storage
@@ -294,7 +294,7 @@ CREATE INDEX idx_created_at ON documents(created_at);
 - [ ] PDF metadata extraction
 - [ ] On-chain vouchers for certificate issuance
 
-## 📊 Success Metrics
+## Success Metrics
 
 - ✅ **44/25+ tests passing** (176% of target)
 - ✅ **Docker builds for riscv64**
@@ -307,7 +307,7 @@ CREATE INDEX idx_created_at ON documents(created_at);
 
 This is a university project (UFBA final project). For questions or suggestions, please refer to the project documentation.
 
-## 📚 References
+## References
 
 - [Cartesi Documentation](https://docs.cartesi.io/)
 - [Cartesi Rollups](https://docs.cartesi.io/cartesi-rollups/)
@@ -315,12 +315,6 @@ This is a university project (UFBA final project). For questions or suggestions,
 - [PROJECT_GUIDE.md](PROJECT_GUIDE.md) - Original specification
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) - Development roadmap
 - [docs/API.md](docs/API.md) - API specification
-
-## 📄 License
-
-[Specify your license here]
-
-## 🎯 Project Status
 
 **MVP Complete** - Ready for deployment and testing on Cartesi network.
 
