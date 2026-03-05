@@ -274,40 +274,6 @@ CREATE INDEX idx_content_hash ON documents(content_hash);
 CREATE INDEX idx_created_at ON documents(created_at);
 ```
 
-**Duplicate Prevention:** The `UNIQUE` constraint on `content_hash` ensures no document can be notarized twice.
-
-## Key Features
-
-### Implemented
-
-- [x] SHA-256 document hashing
-- [x] SQLite persistence with UNIQUE constraints
-- [x] Duplicate detection
-- [x] Document verification by hash
-- [x] Notarization receipts with proofs
-- [x] Cartesi notice emission (verifiable on-chain)
-- [x] Cartesi report emission (query results)
-- [x] Error handling (invalid JSON, invalid base64, etc.)
-- [x] 44 comprehensive tests
-- [x] RISC-V Docker build
-
-### Future Enhancements
-
-- [ ] GPG signature verification
-- [ ] IPFS integration for document storage
-- [ ] RFC3161 timestamp authority integration
-- [ ] Multi-signature support
-- [ ] PDF metadata extraction
-- [ ] On-chain vouchers for certificate issuance
-
-## Success Metrics
-
-- ✅ **44/25+ tests passing** (176% of target)
-- ✅ **Docker builds for riscv64**
-- ✅ **No compiler warnings**
-- ✅ **Code formatted with rustfmt**
-- ✅ **Clippy clean**
-- ✅ **All core features working**
 
 ## 🤝 Contributing
 
